@@ -11,13 +11,11 @@ import (
 	tftest "github.com/hashicorp/terraform-plugin-test"
 	testing "github.com/mitchellh/go-testing-interface"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/acctest"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
 func runPostTestDestroy(t testing.T, c TestCase, wd *tftest.WorkingDir, providers map[string]*schema.Provider) error {
-
 	runProviderCommand(func() error {
 		wd.RequireDestroy(t)
 		return nil
@@ -38,10 +36,10 @@ func runPostTestDestroy(t testing.T, c TestCase, wd *tftest.WorkingDir, provider
 	return nil
 }
 
-func runNewTest(t testing.T, c TestCase, providers map[string]*schema.Provider) {
+func runNewTest(t testing.T, c TestCase, providers map[string]*schema.Provider, helper *tftest.Helper) {
 	spewConf := spew.NewDefaultConfig()
 	spewConf.SortKeys = true
-	wd := acctest.TestHelper.RequireNewWorkingDir(t)
+	wd := helper.RequireNewWorkingDir(t)
 
 	defer func() {
 		var statePreDestroy *terraform.State
@@ -60,14 +58,16 @@ func runNewTest(t testing.T, c TestCase, providers map[string]*schema.Provider) 
 	providerCfg := testProviderConfig(c)
 
 	wd.RequireSetConfig(t, providerCfg)
-	wd.RequireInit(t)
+	runProviderCommand(func() error {
+		wd.RequireInit(t)
+		return nil
+	}, wd, defaultPluginServeOpts(wd, providers))
 
 	// use this to track last step succesfully applied
 	// acts as default for import tests
 	var appliedCfg string
 
 	for i, step := range c.Steps {
-
 		if step.PreConfig != nil {
 			step.PreConfig()
 		}
@@ -82,10 +82,10 @@ func runNewTest(t testing.T, c TestCase, providers map[string]*schema.Provider) 
 				continue
 			}
 		}
+		step.providers = providers
 
 		if step.ImportState {
-			step.providers = providers
-			err := testStepNewImportState(t, c, wd, step, appliedCfg)
+			err := testStepNewImportState(t, c, helper, wd, step, appliedCfg)
 			if err != nil {
 				t.Fatal(err)
 			}

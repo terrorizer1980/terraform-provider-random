@@ -3,8 +3,6 @@ package random
 import (
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -25,9 +23,4 @@ func TestProvider(t *testing.T) {
 }
 
 func testAccPreCheck(t *testing.T) {
-}
-
-func TestMain(m *testing.M) {
-	acctest.UseBinaryDriver("random", Provider)
-	resource.TestMain(m)
 }
