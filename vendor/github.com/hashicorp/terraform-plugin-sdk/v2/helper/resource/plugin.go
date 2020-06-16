@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/logging"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	grpcplugin "github.com/hashicorp/terraform-plugin-sdk/v2/internal/helper/plugin"
 	proto "github.com/hashicorp/terraform-plugin-sdk/v2/internal/tfplugin5"
@@ -27,10 +28,9 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	// provider name here. Fortunately, when only a provider name is
 	// specified in a provider block--which is how the config file we
 	// generate does things--Terraform just automatically assumes it's in
-	// the hashicorp namespace and the default registry.terraform.io host,
+	// the legacy namespace and the default registry.terraform.io host,
 	// so we can just construct the output of GetDisplay() ourselves, based
-	// on the provider name. GetDisplay() omits the default host, so for
-	// our purposes this will always be hashicorp/PROVIDER_NAME.
+	// on the provider name.
 	providerName := wd.GetHelper().GetPluginName()
 
 	// providerName gets returned as terraform-provider-foo, and we need
@@ -52,14 +52,38 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	os.Setenv("PLUGIN_PROTOCOL_VERSIONS", "5")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	config, closeCh, err := plugin.DebugServe(ctx, opts)
 	if err != nil {
 		return err
 	}
 
-	reattachStr, err := json.Marshal(map[string]plugin.ReattachConfig{
-		"hashicorp/" + providerName: config,
-	})
+	// plugin.DebugServe hijacks our log output location, so let's reset it
+	logging.SetOutput()
+
+	reattachInfo := map[string]plugin.ReattachConfig{}
+	var namespaces []string
+	host := "registry.terraform.io"
+	if v := os.Getenv("TF_ACC_PROVIDER_NAMESPACE"); v != "" {
+		namespaces = append(namespaces, v)
+	} else {
+		// unfortunately, we need to populate both of them
+		// Terraform 0.12.26 and higher uses the legacy mode ("-")
+		// Terraform 0.13.0 and higher uses the default mode ("hashicorp")
+		// because of the change in how providers are addressed in 0.13
+		namespaces = append(namespaces, "-", "hashicorp")
+	}
+	if v := os.Getenv("TF_ACC_PROVIDER_HOST"); v != "" {
+		host = v
+	}
+
+	for _, ns := range namespaces {
+		reattachInfo[strings.TrimSuffix(host, "/")+"/"+
+			strings.TrimSuffix(ns, "/")+"/"+
+			providerName] = config
+	}
+
+	reattachStr, err := json.Marshal(reattachInfo)
 	if err != nil {
 		return err
 	}

@@ -36,8 +36,14 @@ type ServeOpts struct {
 	// added to the GRPC functions when possible.
 	GRPCProviderFunc GRPCProviderFunc
 
+	// Logger is the logger that go-plugin will use.
 	Logger hclog.Logger
 
+	// TestConfig should only be set when the provider is being tested; it
+	// will opt out of go-plugin's lifecycle management and other features,
+	// and will use the supplied configuration options to control the
+	// plugin's lifecycle and communicate connection information. See the
+	// go-plugin GoDoc for more information.
 	TestConfig *plugin.ServeTestConfig
 }
 

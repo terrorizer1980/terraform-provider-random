@@ -62,7 +62,7 @@ func (r *ResourceImporter) InternalValidate() error {
 		return errors.New("Both State and StateContext cannot be set.")
 	}
 	if r.State != nil && r.StateContext == nil {
-		//log.Printf("[WARN] State is deprecated, please use StateContext")
+		log.Printf("[WARN] State is deprecated, please use StateContext")
 	}
 	return nil
 }
